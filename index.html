@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>D3 Page</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+</head>
+
+<body>
+    <table>
+        <tr>
+            <td><label for="colorPicker">Color:</label></td>
+            <td><input type="color" id="colorPicker" value="#0063b1"></td>
+        </tr>
+        <tr>
+            <td><label for="widthInput">Width:</label></td>
+            <td><input type="number" id="widthInput" value="2560" step="1"></td>
+        </tr>
+        <tr>
+            <td><label for="heightInput">Height:</label></td>
+            <td><input type="number" id="heightInput" value="1440" step="1"></td>
+        </tr>
+        <tr>
+            <td><label for="dotSpacingXInput">Dot Spacing X:</label></td>
+            <td><input type="number" id="dotSpacingXInput" value="75" step="1"></td>
+        </tr>
+        <tr>
+            <td><label for="dotSpacingYInput">Dot Spacing Y:</label></td>
+            <td><input type="number" id="dotSpacingYInput" value="104" step="1"></td>
+        </tr>
+        <tr>
+            <td><label for="offsetXInput">Offset X:</label></td>
+            <td><input type="number" id="offsetXInput" value="75" step="1"></td>
+        </tr>
+        <tr>
+            <td><label for="offsetYInput">Offset Y:</label></td>
+            <td><input type="number" id="offsetYInput" value="-2" step="1"></td>
+        </tr>
+        <tr>
+            <td><label for="dotSizeInput">Dot Size:</label></td>
+            <td><input type="number" id="dotSizeInput" value="5" step="1"></td>
+        </tr>
+        <tr>
+            <td><label for="transparencyInput">Transparency:</label></td>
+            <td><input type="range" id="transparencyInput" min="0" max="1" step="0.01" value="0.2"></td>
+        </tr>
+        <tr>
+            <td><label for="fencesInput">Fences (JSON):</label></td>
+            <td><textarea id="fencesInput" rows="24" cols="44">[
+    {
+        "title": "myfence",
+        "x": 9,
+        "y": 2,
+        "width": 6,
+        "height": 10
+    },
+    {
+        "title": "myfence",
+        "x": 17,
+        "y": 2,
+        "width": 6,
+        "height": 4
+    },
+    {
+        "title": "myfence",
+        "x": 17,
+        "y": 8,
+        "width": 6,
+        "height": 4
+    },
+    {
+        "title": "myfence",
+        "x": 25,
+        "y": 2,
+        "width": 6,
+        "height": 4
+    },
+    {
+        "title": "myfence",
+        "x": 25,
+        "y": 8,
+        "width": 6,
+        "height": 4
+    }
+]</textarea></td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <button id="draw">Draw</button>
+                <button id="export-btn">Export</button>
+            </td>
+        </tr>
+    </table>
+    <script>
+        var width = parseInt(document.getElementById('widthInput').value, 10);
+        var height = parseInt(document.getElementById('heightInput').value, 10);
+        var offsetX = parseInt(document.getElementById('offsetXInput').value, 10);
+        var offsetY = parseInt(document.getElementById('offsetYInput').value, 10);
+
+        var colorPicker = document.getElementById('colorPicker');
+        colorPicker.addEventListener('input', function () {
+            d3.select("svg").style("background-color", colorPicker.value);
+        }, false);
+
+        function createPatternDrawer(canvasWidth, canvasHeight, offsetX, offsetY) {
+            return function (svg, spacingX, spacingY, shape) {
+                for (var x = offsetX; x < canvasWidth; x += spacingX) { // Start from the second column
+                    for (var y = offsetY; y < canvasHeight; y += spacingY) { // Start from the second row
+                        shape(svg, x, y)
+                    }
+                }
+            }
+        }
+
+        function createCrossDrawer(size, transparency) {
+            return function (svg, x, y) {
+                svg.append('line')
+                    .attr("x1", x - size)
+                    .attr("y1", y)
+                    .attr("x2", x + size)
+                    .attr("y2", y)
+                    .style("stroke", `rgba(0, 0, 0, ${transparency})`)
+                    .style("stroke-width", 2);
+                svg.append('line')
+                    .attr("x1", x)
+                    .attr("y1", y - size)
+                    .attr("x2", x)
+                    .attr("y2", y + size)
+                    .style("stroke", `rgba(0, 0, 0, ${transparency})`)
+                    .style("stroke-width", 2);
+            }
+        }
+
+        var svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .style("background-color", colorPicker.value);
+
+        function draw() {
+            d3.select("svg").selectAll("*").remove();
+
+            var dotSpacingX = parseInt(document.getElementById('dotSpacingXInput').value, 10); // Space between dots
+            var dotSpacingY = parseInt(document.getElementById('dotSpacingYInput').value, 10); // Space between dots
+            var dotSize = parseInt(document.getElementById('dotSizeInput').value, 10); // Radius of dots
+            var transparency = parseFloat(document.getElementById('transparencyInput').value);
+            // var fencesText = document.getElementById('fencesInput').value;
+            // console.log(fencesText)
+            var fences = JSON.parse(document.getElementById('fencesInput').value);
+
+            var patternDrawer = createPatternDrawer(width, height, offsetX, offsetY);
+            var shapeDrawer = createCrossDrawer(dotSize, transparency);
+            var fencesDrawer = createFencesDrawer(dotSpacingX, dotSpacingY, offsetX, offsetY)
+            patternDrawer(svg, dotSpacingX, dotSpacingY, shapeDrawer);
+            fencesDrawer(svg, fences)
+        }
+
+        // position and size are in grid
+        // var fences = JSON.parse(document.getElementById('fencesInput').value);
+
+        function createFencesDrawer(gridWidth, gridHeight, offsetX, offsetY) {
+            var titleBarHeight = 32
+            var extentSize = gridWidth / 2
+            return function (svg, fences) {
+                fences.forEach(fence => {
+                    let x = fence.x * gridWidth + offsetX - extentSize;
+                    let y = fence.y * gridHeight + offsetY - extentSize;
+                    let width = (fence.width + 1) * gridWidth;
+                    let height = (fence.height + 1) * gridHeight - titleBarHeight;
+
+                    svg.append('rect')
+                        .attr('x', x)
+                        .attr('y', y)
+                        .attr('width', width)
+                        .attr('height', height)
+                        .style('fill', 'rgba(0, 0, 0, 0.4)');
+
+                    svg.append('rect')
+                        .attr('x', x)
+                        .attr('y', y - titleBarHeight) // Positioning the title bar above the fence rectangle
+                        .attr('width', width)
+                        .attr('height', titleBarHeight) // Fixed height for the title bar
+                        .style('fill', 'rgba(0, 0, 0, 0.6)'); // A distinct color for the title bar
+
+                    svg.append('text')
+                        .attr('x', x + width / 2)
+                        .attr('y', y - titleBarHeight / 2) // Adjusting the y position to render the title in the middle of the title bar vertically
+                        .attr('text-anchor', 'middle') // Centering the text above the rectangle
+                        .attr('dominant-baseline', 'middle') // Aligning text vertically in the middle
+                        .text(fence.title)
+                        .style('fill', 'white');
+                });
+
+            }
+        }
+
+        // Function to convert SVG to PNG
+        function convertSVGToPNG() {
+            var svgElement = document.querySelector('svg');
+            var serializer = new XMLSerializer();
+            var svgString = serializer.serializeToString(svgElement);
+
+            var img = new Image();
+            var svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+            var url = URL.createObjectURL(svgBlob);
+
+            img.onload = function () {
+                var canvas = document.createElement("canvas");
+                canvas.width = svgElement.width.baseVal.value;
+                canvas.height = svgElement.height.baseVal.value;
+                var ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+
+                var imgURI = canvas
+                    .toDataURL("image/png")
+                    .replace("image/png", "image/octet-stream");
+
+                // Triggering a download
+                var evt = new MouseEvent("click", {
+                    view: window,
+                    bubbles: false,
+                    cancelable: true
+                });
+
+                var a = document.createElement("a");
+                a.setAttribute("download", "D3_Visualization.png");
+                a.setAttribute("href", imgURI);
+                a.setAttribute("target", '_blank');
+                a.dispatchEvent(evt);
+            };
+
+            img.src = url;
+        }
+
+        draw()
+
+        // Call the function to convert and download the SVG as PNG
+        document.getElementById('draw').addEventListener('click', draw);
+        document.getElementById('export-btn').addEventListener('click', convertSVGToPNG);
+
+    </script>
+</body>
+
+</html>
